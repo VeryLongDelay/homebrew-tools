@@ -1,0 +1,57 @@
+name: Sync formulae
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - source_repo: gitig
+            formula: gitig.rb
+
+    steps:
+      - name: Checkout homebrew-tools
+        uses: actions/checkout@v6
+        with:
+          path: homebrew-tools
+
+      - name: Checkout source repo
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/${{ matrix.source_repo }}
+          path: source
+
+      - name: Copy formula
+        run: |
+          set -euo pipefail
+
+          mkdir -p homebrew-tools/Formula
+          cp "source/Formula/${{ matrix.formula }}" "homebrew-tools/Formula/${{ matrix.formula }}"
+
+      - name: Commit changes
+        working-directory: homebrew-tools
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- "Formula/${{ matrix.formula }}"; then
+              echo "No changes for ${{ matrix.formula }}."
+              exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add "Formula/${{ matrix.formula }}"
+          git commit -m "Sync ${{ matrix.formula }}"
+          git pull --rebase
+          git push
