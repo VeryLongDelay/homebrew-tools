@@ -45,29 +45,36 @@ jobs:
 
           FORMULA="Formula/${{ matrix.formula }}"
 
+          extract_version() {
+              ruby -e '
+                  content = STDIN.read
+
+                  version = content[/^\s*version\s+["'\'']([^"'\'']+)["'\'']/, 1]
+
+                  version ||= content[/^\s*url\s+["'\''][^"'\'']*\/archive\/refs\/tags\/v?([^\/"'\'']+)\.(?:tar\.gz|zip)["'\'']/, 1]
+                  version ||= content[/^\s*url\s+["'\''][^"'\'']*\/archive\/v?([^\/"'\'']+)\.(?:tar\.gz|zip)["'\'']/, 1]
+                  version ||= content[/^\s*url\s+["'\''][^"'\'']*\/releases\/download\/v?([^\/"'\'']+)\//, 1]
+                  version ||= content[/^\s*url\s+["'\''][^"'\'']*\/download\/v?([^\/"'\'']+)\//, 1]
+                  version ||= content[/^\s*url\s+["'\''][^"'\'']*\/refs\/tags\/v?([^\/"'\'']+)["'\'']/, 1]
+
+                  puts(version || "")
+              '
+          }
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           OLD_VERSION="new"
 
-          if git cat-file -e HEAD:"$FORMULA" 2>/dev/null; then
-              OLD_VERSION=$(
-                  git show HEAD:"$FORMULA" \
-                  | grep -E '^[[:space:]]*version[[:space:]]+"' \
-                  | head -n1 \
-                  | sed -E 's/.*version[[:space:]]+"([^"]+)".*/\1/'
-              )
+          if git cat-file -e "HEAD:$FORMULA" 2>/dev/null; then
+              OLD_VERSION="$(git show "HEAD:$FORMULA" | extract_version)"
 
               if [ -z "${OLD_VERSION:-}" ]; then
                   OLD_VERSION="unknown"
               fi
           fi
 
-          NEW_VERSION=$(
-              grep -E '^[[:space:]]*version[[:space:]]+"' "$FORMULA" \
-              | head -n1 \
-              | sed -E 's/.*version[[:space:]]+"([^"]+)".*/\1/'
-          )
+          NEW_VERSION="$(cat "$FORMULA" | extract_version)"
 
           if [ -z "${NEW_VERSION:-}" ]; then
               NEW_VERSION="unknown"
