@@ -43,16 +43,43 @@ jobs:
         run: |
           set -euo pipefail
 
+          FORMULA="Formula/${{ matrix.formula }}"
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add "Formula/${{ matrix.formula }}"
+          OLD_VERSION="new"
+
+          if git cat-file -e HEAD:"$FORMULA" 2>/dev/null; then
+              OLD_VERSION=$(
+                  git show HEAD:"$FORMULA" \
+                  | grep -E '^[[:space:]]*version[[:space:]]+"' \
+                  | head -n1 \
+                  | sed -E 's/.*version[[:space:]]+"([^"]+)".*/\1/'
+              )
+
+              if [ -z "${OLD_VERSION:-}" ]; then
+                  OLD_VERSION="unknown"
+              fi
+          fi
+
+          NEW_VERSION=$(
+              grep -E '^[[:space:]]*version[[:space:]]+"' "$FORMULA" \
+              | head -n1 \
+              | sed -E 's/.*version[[:space:]]+"([^"]+)".*/\1/'
+          )
+
+          if [ -z "${NEW_VERSION:-}" ]; then
+              NEW_VERSION="unknown"
+          fi
+
+          git add "$FORMULA"
 
           if git diff --cached --quiet; then
               echo "No changes for ${{ matrix.formula }}."
               exit 0
           fi
 
-          git commit -m "Sync ${{ matrix.formula }}"
+          git commit -m "Update: ${{ matrix.formula }} ${OLD_VERSION} --> ${NEW_VERSION}"
           git pull --rebase
           git push
